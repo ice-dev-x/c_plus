@@ -1,0 +1,55 @@
+{
+  "id": "cuevana-plus",
+  "name": "Cuevana+",
+  "version": "1.0.0",
+  "apiVersion": 6,
+  "browser": true,
+  "entry": "plugin.js",
+  "section": { "label": "Cuevana+" },
+  "icon": "icon.png",
+  "author": "sadmachine",
+  "description": "Películas y series de Cuevana+ en español latino, castellano y subtitulado.",
+   "color": "#02060a",
+  "theme": {
+    "accent": "#38bdf8",
+    "onAccent": "#0f172a",
+    "background": "#0b131d",
+    "surface": "#131f30",
+    "highlight": "#38bdf8"
+  },
+  "hosts": [
+    "cuevana3k.pro",
+    "*.cuevana3k.pro",
+    "filemoon.sx",
+    "*.filemoon.sx",
+    "lkhjerbhye3wjkhodvh5xiczuvd.lol",
+    "*.lkhjerbhye3wjkhodvh5xiczuvd.lol",
+    "lkhjerbhye3wjkhodvh5xlczuvd.lol",
+    "*.lkhjerbhye3wjkhodvh5xlczuvd.lol",
+    "dood.li",
+    "*.dood.li",
+    "dramiyos-cdn.com",
+    "*.dramiyos-cdn.com",
+    "swcdn.net",
+    "*.swcdn.net",
+    "luluvdo.com",
+    "*.luluvdo.com",
+    "acek-cdn.com",
+    "*.acek-cdn.com"
+    
+  ],
+  "streamHosts": "any",
+  "capabilities": [
+    "search",
+    "home",
+    "browse",
+    "episodes",
+    "resolve",
+    "download"
+  ],
+  "categories": [
+    "movies",
+    "series"
+  ]
+ 
+}
