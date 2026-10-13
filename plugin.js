@@ -161,10 +161,10 @@ function base64Decode(str) {
   }
 }
 
-function extractTmdbId(url) {
+/*function extractTmdbId(url) {
   const m = url.match(/\/(?:pelicula|serie)\/(\d+)\//);
   return m ? parseInt(m[1], 10) : null;
-}
+}*/
 
 // --- EXTRACCIÓN INTELIGENTE (Separa Fondos y Pósters) ---
 // --- EXTRACCIÓN INTELIGENTE HD (Evita imágenes borrosas de carga) ---
