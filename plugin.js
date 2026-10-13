@@ -168,7 +168,7 @@ function base64Decode(str) {
 
 // --- EXTRACCIÓN INTELIGENTE (Separa Fondos y Pósters) ---
 
-// --- EXTRACCIÓN INTELIGENTE DEFINITIVA (Detecta el carrusel vs cuadrícula) ---
+// --- EXTRACCIÓN SEGURA Y DEFINITIVA ---
 function extractItems(html, limit = 20, isEpisode = false) {
   if (!html) return [];
   const itemsMap = new Map();
@@ -186,30 +186,26 @@ function extractItems(html, limit = 20, isEpisode = false) {
 
     const innerHtml = match[2];
     
-    // 1. Buscamos de dónde viene la imagen
-    const imgDataSrc = innerHtml.match(/data-src="([^"]+)"/i);
-    const imgDataLazy = innerHtml.match(/data-lazy="([^"]+)"/i);
-    const imgSrc = innerHtml.match(/src="([^"]+)"/i);
-    
-    const imgMatch = imgDataSrc || imgDataLazy || imgSrc;
+    // Buscamos cualquier fuente de imagen disponible de forma flexible
+    const imgMatch = innerHtml.match(/data-src="([^"]+)"/i) || 
+                     innerHtml.match(/data-lazy="([^"]+)"/i) || 
+                     innerHtml.match(/src="([^"]+)"/i);
+                     
     const titleMatch = innerHtml.match(/<h2[^>]*>([^<]+)<\/h2>/i) || innerHtml.match(/alt="([^"]+)"/i);
     
     if (imgMatch && titleMatch) {
       let imgUrl = imgMatch[1];
+      
+      // Ignoramos imágenes vacías o de carga temporal
+      if (!imgUrl || imgUrl.startsWith('data:')) continue;
+
       if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
       if (imgUrl.startsWith("/")) imgUrl = BASE_URL + imgUrl;
-      
-      // Mejoramos la calidad forzando w500 en TMDB
-      imgUrl = imgUrl.replace(/\/w\d{2,3}\//, '/w500/');
       
       const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
       const linkKey = fullLink.split('?')[0].replace(/\/$/, "");
       
-      // 2. MAGIA: ¿Viene de la cuadrícula (lazy) o del carrusel (src)?
-      const isGrid = !!(imgDataSrc || imgDataLazy);
-      
-      // Es horizontal si tiene formato ancho, es episodio, o NO viene de la cuadrícula
-      const isHorizontal = imgUrl.includes('w780') || imgUrl.includes('w1280') || imgUrl.includes('backdrop') || isEpisode || !isGrid;
+      const isHorizontal = imgUrl.includes('w780') || imgUrl.includes('w1280') || imgUrl.includes('backdrop') || isEpisode;
 
       if (!itemsMap.has(linkKey)) {
         const item = {
@@ -217,28 +213,21 @@ function extractItems(html, limit = 20, isEpisode = false) {
           ref: fullLink,
           title: cleanText(titleMatch[1] || titleMatch[2]),
           kind: linkKey.includes("/serie/") ? "series" : "movie",
-          poster: isHorizontal ? null : imgUrl,     // Si es horizontal, lo dejamos vacío por ahora
-          backdrop: isHorizontal ? imgUrl : null,   // Lo guardamos como fondo de pantalla
+          poster: isHorizontal ? null : imgUrl,
+          backdrop: isHorizontal ? imgUrl : null,
           tempImg: imgUrl
         };
         itemsMap.set(linkKey, item);
       } else {
         const existingItem = itemsMap.get(linkKey);
-        
-        // 3. Si encontramos la película de nuevo en la cuadrícula, SOBRESCRIBIMOS el póster
-        if (isGrid && !isHorizontal) {
-            existingItem.poster = imgUrl; // Aquí atrapa la verdadera carátula de Spider-Man
-        } else if (isHorizontal && !existingItem.backdrop) {
-            existingItem.backdrop = imgUrl;
-        }
+        if (!isHorizontal && !existingItem.poster) existingItem.poster = imgUrl;
+        else if (isHorizontal && !existingItem.backdrop) existingItem.backdrop = imgUrl;
       }
     }
   }
   
-  // Limpieza final para enviarlo a Kino
   const results = [];
   for (const item of itemsMap.values()) {
-    // Si solo encontró una versión, la clona para que no queden cuadros negros
     if (!item.poster) item.poster = item.backdrop || item.tempImg;
     if (!item.backdrop) item.backdrop = item.poster || item.tempImg;
     delete item.tempImg;

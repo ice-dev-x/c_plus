@@ -1,7 +1,7 @@
 {
   "id": "cuevana-plus",
   "name": "Cuevana+",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "apiVersion": 6,
   "browser": true,
   "entry": "plugin.js",
