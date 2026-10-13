@@ -166,16 +166,14 @@ function extractTmdbId(url) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-// --- EXTRACCIÓN INTELIGENTE (Separa Fondos y Pósters) ---
-
-// --- EXTRACCIÓN SEGURA Y DEFINITIVA ---
 function extractItems(html, limit = 20, isEpisode = false) {
   if (!html) return [];
-  const itemsMap = new Map();
+  const items = [];
+  const vistos = new Set();
   const aRegex = /<a[^>]+href="([^"]+(?:\/pelicula\/|\/serie\/)[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match;
 
-  while ((match = aRegex.exec(html)) !== null) {
+  while ((match = aRegex.exec(html)) !== null && items.length < limit) {
     let link = match[1];
     if (isEpisode) {
       if (!link.includes("episodio")) continue;
@@ -183,61 +181,33 @@ function extractItems(html, limit = 20, isEpisode = false) {
     } else {
       if (link.includes("episodio")) continue;
     }
-
     const innerHtml = match[2];
-    
-    // Buscamos cualquier fuente de imagen disponible de forma flexible
-    const imgMatch = innerHtml.match(/data-src="([^"]+)"/i) || 
-                     innerHtml.match(/data-lazy="([^"]+)"/i) || 
-                     innerHtml.match(/src="([^"]+)"/i);
-                     
+    const imgMatch = innerHtml.match(/(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/i);
     const titleMatch = innerHtml.match(/<h2[^>]*>([^<]+)<\/h2>/i) || innerHtml.match(/alt="([^"]+)"/i);
-    
-    if (imgMatch && titleMatch) {
-      let imgUrl = imgMatch[1];
-      
-      // Ignoramos imágenes vacías o de carga temporal
-      if (!imgUrl || imgUrl.startsWith('data:')) continue;
-
-      if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
-      if (imgUrl.startsWith("/")) imgUrl = BASE_URL + imgUrl;
-      
+    if (imgMatch && titleMatch && !vistos.has(link)) {
+      vistos.add(link);
+      let poster = imgMatch[1] || imgMatch[2];
+      if (poster.startsWith("//")) poster = "https:" + poster;
+      if (poster.startsWith("/")) poster = BASE_URL + poster;
       const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
-      const linkKey = fullLink.split('?')[0].replace(/\/$/, "");
+      const tmdbId = extractTmdbId(fullLink);
       
-      const isHorizontal = imgUrl.includes('w780') || imgUrl.includes('w1280') || imgUrl.includes('backdrop') || isEpisode;
-
-      if (!itemsMap.has(linkKey)) {
-        const item = {
-          id: "item-" + linkKey.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
-          ref: fullLink,
-          title: cleanText(titleMatch[1] || titleMatch[2]),
-          kind: linkKey.includes("/serie/") ? "series" : "movie",
-          poster: isHorizontal ? null : imgUrl,
-          backdrop: isHorizontal ? imgUrl : null,
-          tempImg: imgUrl
-        };
-        itemsMap.set(linkKey, item);
-      } else {
-        const existingItem = itemsMap.get(linkKey);
-        if (!isHorizontal && !existingItem.poster) existingItem.poster = imgUrl;
-        else if (isHorizontal && !existingItem.backdrop) existingItem.backdrop = imgUrl;
-      }
+      const item = {
+        id: "item-" + fullLink.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
+        ref: fullLink,
+        title: cleanText(titleMatch[1] || titleMatch[2]),
+        kind: link.includes("/serie/") ? "series" : "movie",
+        poster: poster,
+        backdrop: poster // Habilita la vista de tarjetas
+      };
+      
+      if (tmdbId) item.ids = { tmdb: tmdbId };
+      items.push(item);
     }
   }
-  
-  const results = [];
-  for (const item of itemsMap.values()) {
-    if (!item.poster) item.poster = item.backdrop || item.tempImg;
-    if (!item.backdrop) item.backdrop = item.poster || item.tempImg;
-    delete item.tempImg;
-    
-    results.push(item);
-    if (results.length >= limit) break;
-  }
-  
-  return results;
+  return items;
 }
+
 export async function home() {
   const fetchPage = async (path) => {
     try {
