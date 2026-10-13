@@ -226,20 +226,32 @@ export async function home() {
   return categories;
 }
 
-// --- BROWSE DIRECTO CON RUTAS REALES ---
+
+// --- BROWSE UNIVERSAL CON PAGINACIÓN EXACTA DE CUEVANA ---
 export async function browse(ref, cursor) {
   await null;
 
-  const isEpisode = ref.includes("tipo=episodios");
-  const path = ref.replace("?tipo=episodios", "");
+  if (!ref) throw kino.error("not_found", "Referencia no válida");
+
+  const isEpisode = ref.includes("tipo=episodios") || ref.includes("episodios");
+  let path = ref.replace("?tipo=episodios", "").replace("tipo=episodios", "");
+  
+  // Si la ruta base está vacía o es solo la barra, la ajustamos a la de episodios recientes si corresponde
+  if (path === "/" && isEpisode) {
+    path = "/episodios/recientes";
+  }
+
   const page = cursor ? Number(cursor) : 1;
 
-  const url = page > 1
-    ? `${BASE_URL}${path}${path.includes("?") ? "&" : "?"}page=${page}`
-    : `${BASE_URL}${path}`;
+  let url = `${BASE_URL}${path}`;
+
+  // Aplicamos la paginación tal como maneja Cuevana
+  if (page > 1) {
+    url += url.includes("?") ? `&page=${page}` : `?page=${page}`;
+  }
 
   const res = await kino.fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-  if (!res.ok) throw kino.error("not_found", "no se pudo cargar la página");
+  if (!res.ok) throw kino.error("not_found", "No se pudo cargar la página");
 
   const html = await res.text();
   const items = extractItems(html, 40, isEpisode);
