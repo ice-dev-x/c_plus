@@ -217,53 +217,32 @@ export async function home() {
     } catch (e) { return ""; }
   };
 
-  // Secciones principales y géneros de películas
-  const htmlHome = await fetchPage("/");
-  const htmlPeliculas = await fetchPage("/peliculas");
-  const htmlSeries = await fetchPage("/series");
-  const htmlPopulares = await fetchPage("/tendencias");
- // const htmlAccion = await fetchPage("/peliculas?genero=accion");
- // const htmlComedia = await fetchPage("/peliculas?genero=comedia");
- // const htmlTerror = await fetchPage("/peliculas?genero=terror");
-  // const htmlAnimacion = await fetchPage("/peliculas?genero=animacion");
-  // const htmlAnime = await fetchPage("/peliculas?genero=anime");
-  // const htmlCienciaFiccion = await fetchPage("/peliculas?genero=ciencia-ficcion");
-  // const htmlSuspenso = await fetchPage("/peliculas?genero=suspenso");
-  // const htmlDrama = await fetchPage("/peliculas?genero=drama");
+  // 1. Descargamos SOLAMENTE las 4 páginas principales (sin géneros)
+  const [htmlHome, htmlPeliculas, htmlSeries, htmlPopulares] = await Promise.all([
+    fetchPage("/"),
+    fetchPage("/peliculas"),
+    fetchPage("/series"),
+    fetchPage("/tendencias")
+  ]);
 
+  // 2. Extraemos los items
   const estrenos = extractItems(htmlHome, 20, false);
   const ultimosEpisodios = extractItems(htmlHome, 20, true);
   const peliculas = extractItems(htmlPeliculas, 20, false);
   const series = extractItems(htmlSeries, 20, false);
   const populares = extractItems(htmlPopulares, 20, false);
-  const accion = extractItems(htmlAccion, 20, false);
-  const comedia = extractItems(htmlComedia, 20, false);
-  const terror = extractItems(htmlTerror, 20, false);
-  const animacion = extractItems(htmlAnimacion, 20, false);
-  const anime = extractItems(htmlAnime, 20, false);
-  const cienciaFic = extractItems(htmlCienciaFiccion, 20, false);
-  const suspenso = extractItems(htmlSuspenso, 20, false);
-  const drama = extractItems(htmlDrama, 20, false);
 
   const categories = [];
 
-  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "🔥 Estrenos Destacados", ref: "estrenos", items: estrenos });
-  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "🆕 Últimos Episodios", ref: "episodios", items: ultimosEpisodios });
-  if (populares.length > 0) categories.push({ id: "populares", title: "⭐ Películas Populares", ref: "populares", items: populares });
-  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "🎬 Películas Agregadas", ref: "peliculas", items: peliculas });
-  if (series.length > 0) categories.push({ id: "series", title: "📺 Series Actualizadas", ref: "series", items: series });
-  if (accion.length > 0) categories.push({ id: "accion", title: "💥 Acción", ref: "accion", items: accion });
-  if (comedia.length > 0) categories.push({ id: "comedia", title: "😂 Comedia", ref: "comedia", items: comedia });
-  if (terror.length > 0) categories.push({ id: "terror", title: "👻 Terror", ref: "terror", items: terror });
-  if (animacion.length > 0) categories.push({ id: "animacion", title: "🎨 Animación", ref: "animacion", items: animacion });
-  if (anime.length > 0) categories.push({ id: "anime", title: "🎌 Anime", ref: "anime", items: anime });
-  if (cienciaFic.length > 0) categories.push({ id: "sci-fi", title: "🚀 Ciencia Ficción", ref: "sci-fi", items: cienciaFic });
-  if (suspenso.length > 0) categories.push({ id: "suspenso", title: "🔍 Suspenso", ref: "suspenso", items: suspenso });
-  if (drama.length > 0) categories.push({ id: "drama", title: "🎭 Drama", ref: "drama", items: drama });
+  // 3. Armamos las 5 filas limpias con sus rutas directas
+  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "🔥 Estrenos Destacados", ref: "/", items: estrenos });
+  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "🆕 Últimos Episodios", ref: "/?tipo=episodios", items: ultimosEpisodios });
+  if (populares.length > 0) categories.push({ id: "populares", title: "⭐ Películas Populares", ref: "/tendencias", items: populares });
+  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "🎬 Películas Agregadas", ref: "/peliculas", items: peliculas });
+  if (series.length > 0) categories.push({ id: "series", title: "📺 Series Actualizadas", ref: "/series", items: series });
 
   return categories;
 }
-
 export async function browse(ref, cursor) {
   await null;
 
