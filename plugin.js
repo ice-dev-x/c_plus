@@ -167,9 +167,10 @@ function extractTmdbId(url) {
 }
 
 // --- EXTRACCIÓN INTELIGENTE (Separa Fondos y Pósters) ---
+// --- EXTRACCIÓN INTELIGENTE HD (Evita imágenes borrosas de carga) ---
 function extractItems(html, limit = 20, isEpisode = false) {
   if (!html) return [];
-  const itemsMap = new Map(); // Usamos un Map en lugar de un Set para poder actualizar items
+  const itemsMap = new Map();
   const aRegex = /<a[^>]+href="([^"]+(?:\/pelicula\/|\/serie\/)[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match;
 
@@ -183,48 +184,60 @@ function extractItems(html, limit = 20, isEpisode = false) {
     }
 
     const innerHtml = match[2];
-    const imgMatch = innerHtml.match(/(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/i);
+    
+    // 1. LA CLAVE: Priorizamos data-src/data-lazy (imagen HD real) y evitamos el src (miniatura borrosa)
+    const imgDataSrc = innerHtml.match(/data-src="([^"]+)"/i);
+    const imgDataLazy = innerHtml.match(/data-lazy="([^"]+)"/i);
+    const imgSrc = innerHtml.match(/src="([^"]+)"/i);
+    
+    const imgMatch = imgDataSrc || imgDataLazy || imgSrc;
     const titleMatch = innerHtml.match(/<h2[^>]*>([^<]+)<\/h2>/i) || innerHtml.match(/alt="([^"]+)"/i);
     
     if (imgMatch && titleMatch) {
-      let poster = imgMatch[1] || imgMatch[2];
+      let poster = imgMatch[1];
       if (poster.startsWith("//")) poster = "https:" + poster;
       if (poster.startsWith("/")) poster = BASE_URL + poster;
       
-      const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
+      // 2. MAGIA EXTRA: Si la imagen es de TMDB, la forzamos siempre a tamaño grande (w500)
+      poster = poster.replace(/\/w\d{2,3}\//, '/w500/');
       
-      if (itemsMap.has(fullLink)) {
-        // 2. Si ya atrapó la película en el banner horizontal, la segunda vez que la vea 
-        // será en la cuadrícula. Aquí actualizamos el póster al formato vertical correcto.
-        const existingItem = itemsMap.get(fullLink);
-        
-        // Solo lo actualizamos si la nueva imagen no es un banner gigante
-        if (existingItem.poster !== poster && !poster.includes('backdrop') && !poster.includes('w780')) {
-            existingItem.poster = poster;
-        }
-      } else {
-        // 1. La atrapa por primera vez (probablemente del banner superior)
+      const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
+      const linkKey = fullLink.split('?')[0].replace(/\/$/, "");
+      
+      const isHorizontal = poster.includes('w780') || poster.includes('w1280') || poster.includes('backdrop') || isEpisode;
+
+      if (!itemsMap.has(linkKey)) {
         const tmdbId = extractTmdbId(fullLink);
         const item = {
-          id: "item-" + fullLink.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
+          id: "item-" + linkKey.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
           ref: fullLink,
           title: cleanText(titleMatch[1] || titleMatch[2]),
-          kind: link.includes("/serie/") ? "series" : "movie",
-          poster: poster,
-          backdrop: poster // Mantiene la alta calidad para la portada superior
+          kind: linkKey.includes("/serie/") ? "series" : "movie",
+          poster: isHorizontal ? null : poster,
+          backdrop: isHorizontal ? poster : null,
+          tempImg: poster
         };
         if (tmdbId) item.ids = { tmdb: tmdbId };
-        
-        itemsMap.set(fullLink, item);
+        itemsMap.set(linkKey, item);
+      } else {
+        const existingItem = itemsMap.get(linkKey);
+        if (isHorizontal && !existingItem.backdrop) existingItem.backdrop = poster;
+        else if (!isHorizontal && !existingItem.poster) existingItem.poster = poster;
       }
     }
-    
-    // Detenemos el bucle cuando tengamos los items requeridos
-    if (itemsMap.size >= limit + 5) break; 
   }
   
-  // Convertimos el mapa de vuelta al array que necesita Kino
-  return Array.from(itemsMap.values()).slice(0, limit);
+  const results = [];
+  for (const item of itemsMap.values()) {
+    if (!item.poster) item.poster = item.backdrop || item.tempImg;
+    if (!item.backdrop) item.backdrop = item.poster || item.tempImg;
+    delete item.tempImg;
+    
+    results.push(item);
+    if (results.length >= limit) break;
+  }
+  
+  return results;
 }
 
 export async function home() {
