@@ -166,14 +166,14 @@ function extractTmdbId(url) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+// --- EXTRACCIÓN INTELIGENTE (Separa Fondos y Pósters) ---
 function extractItems(html, limit = 20, isEpisode = false) {
   if (!html) return [];
-  const items = [];
-  const vistos = new Set();
+  const itemsMap = new Map(); // Usamos un Map en lugar de un Set para poder actualizar items
   const aRegex = /<a[^>]+href="([^"]+(?:\/pelicula\/|\/serie\/)[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match;
 
-  while ((match = aRegex.exec(html)) !== null && items.length < limit) {
+  while ((match = aRegex.exec(html)) !== null) {
     let link = match[1];
     if (isEpisode) {
       if (!link.includes("episodio")) continue;
@@ -181,31 +181,50 @@ function extractItems(html, limit = 20, isEpisode = false) {
     } else {
       if (link.includes("episodio")) continue;
     }
+
     const innerHtml = match[2];
     const imgMatch = innerHtml.match(/(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/i);
     const titleMatch = innerHtml.match(/<h2[^>]*>([^<]+)<\/h2>/i) || innerHtml.match(/alt="([^"]+)"/i);
-    if (imgMatch && titleMatch && !vistos.has(link)) {
-      vistos.add(link);
+    
+    if (imgMatch && titleMatch) {
       let poster = imgMatch[1] || imgMatch[2];
       if (poster.startsWith("//")) poster = "https:" + poster;
       if (poster.startsWith("/")) poster = BASE_URL + poster;
+      
       const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
-      const tmdbId = extractTmdbId(fullLink);
       
-      const item = {
-        id: "item-" + fullLink.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
-        ref: fullLink,
-        title: cleanText(titleMatch[1] || titleMatch[2]),
-        kind: link.includes("/serie/") ? "series" : "movie",
-        poster: poster,
-        backdrop: poster // Habilita la vista de tarjetas
-      };
-      
-      if (tmdbId) item.ids = { tmdb: tmdbId };
-      items.push(item);
+      if (itemsMap.has(fullLink)) {
+        // 2. Si ya atrapó la película en el banner horizontal, la segunda vez que la vea 
+        // será en la cuadrícula. Aquí actualizamos el póster al formato vertical correcto.
+        const existingItem = itemsMap.get(fullLink);
+        
+        // Solo lo actualizamos si la nueva imagen no es un banner gigante
+        if (existingItem.poster !== poster && !poster.includes('backdrop') && !poster.includes('w780')) {
+            existingItem.poster = poster;
+        }
+      } else {
+        // 1. La atrapa por primera vez (probablemente del banner superior)
+        const tmdbId = extractTmdbId(fullLink);
+        const item = {
+          id: "item-" + fullLink.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
+          ref: fullLink,
+          title: cleanText(titleMatch[1] || titleMatch[2]),
+          kind: link.includes("/serie/") ? "series" : "movie",
+          poster: poster,
+          backdrop: poster // Mantiene la alta calidad para la portada superior
+        };
+        if (tmdbId) item.ids = { tmdb: tmdbId };
+        
+        itemsMap.set(fullLink, item);
+      }
     }
+    
+    // Detenemos el bucle cuando tengamos los items requeridos
+    if (itemsMap.size >= limit + 5) break; 
   }
-  return items;
+  
+  // Convertimos el mapa de vuelta al array que necesita Kino
+  return Array.from(itemsMap.values()).slice(0, limit);
 }
 
 export async function home() {
@@ -235,11 +254,11 @@ export async function home() {
   const categories = [];
 
   // 3. Armamos las 5 filas limpias con sus rutas directas
-  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "🔥 Estrenos Destacados", ref: "/", items: estrenos });
-  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "🆕 Últimos Episodios", ref: "/?tipo=episodios", items: ultimosEpisodios });
-  if (populares.length > 0) categories.push({ id: "populares", title: "⭐ Películas Populares", ref: "/tendencias", items: populares });
-  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "🎬 Películas Agregadas", ref: "/peliculas", items: peliculas });
-  if (series.length > 0) categories.push({ id: "series", title: "📺 Series Actualizadas", ref: "/series", items: series });
+  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "Estrenos Destacados", ref: "/", items: estrenos });
+  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "Últimos Episodios", ref: "/?tipo=episodios", items: ultimosEpisodios });
+  if (populares.length > 0) categories.push({ id: "populares", title: "Películas Populares", ref: "/tendencias", items: populares });
+  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "Películas Agregadas", ref: "/peliculas", items: peliculas });
+  if (series.length > 0) categories.push({ id: "series", title: "Series Actualizadas", ref: "/series", items: series });
 
   return categories;
 }
