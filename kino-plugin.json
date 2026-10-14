@@ -1,7 +1,7 @@
 {
   "id": "cuevana-plus",
   "name": "Cuevana+",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "apiVersion": 6,
   "browser": true,
   "entry": "plugin.js",
@@ -18,8 +18,8 @@
     "highlight": "#e9f5ed"
   },
   "hosts": [
-    "cuevana3k.pro",
-    "*.cuevana3k.pro",
+    "cuevana3r.pro",
+    "*.cuevana3r.pro",
     "filemoon.sx",
     "*.filemoon.sx",
     "lkhjerbhye3wjkhodvh5xiczuvd.lol",
