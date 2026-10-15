@@ -168,7 +168,14 @@ function extractItems(html, limit = 20, isEpisode = false) {
 
     const innerHtml = match[2];
     
-    // 1. Extraer todas las imágenes disponibles en el bloque
+    // 1. Ignorar el banner principal gigante de Cuevana.
+    // Al saltar el bloque que tiene el botón "Ver Película" o descripciones largas,
+    // obligamos al scraper a tomar la película desde la cuadrícula (donde tiene el póster vertical).
+    if (innerHtml.toLowerCase().includes("ver película") || innerHtml.includes("class=\"Description\"")) {
+      continue;
+    }
+
+    // 2. Extraer todas las imágenes disponibles en el bloque
     const imgRegex = /(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/gi;
     const foundImages = [];
     let imgMatch;
@@ -176,15 +183,13 @@ function extractItems(html, limit = 20, isEpisode = false) {
       foundImages.push(imgMatch[1] || imgMatch[2]);
     }
 
-    // Si no hay imágenes, saltar al siguiente
     if (foundImages.length === 0) continue;
 
-    // 2. Priorizar imágenes .jpg sobre .png para evitar logos transparentes
+    // 3. Priorizar imágenes .jpg sobre .png para evitar logos transparentes
     let imgUrl = foundImages.find(img => img.toLowerCase().includes(".jpg") || img.toLowerCase().includes(".jpeg")) || foundImages[0];
 
-    // 3. Forzar resolución a máxima calidad (Original) en TMDB
+    // 4. Forzar resolución a máxima calidad (Original) en TMDB
     imgUrl = imgUrl.replace(/\/(w\d+|thumb)\//i, "/original/");
-    // Si la imagen usa miniaturas de WordPress, quitamos la compresión
     imgUrl = imgUrl.replace(/-\d+x\d+\.(jpg|jpeg|png)$/i, ".$1");
 
     const titleMatch = innerHtml.match(/<h[23][^>]*>([^<]+)<\/h[23]>/i) || innerHtml.match(/alt="([^"]+)"/i);
