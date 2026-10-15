@@ -235,34 +235,56 @@ export async function home() {
     } catch (e) { return ""; }
   };
 
-  // 1. Hacemos las peticiones únicamente a los links que elegiste
-  const [htmlPeliculasPopulares, htmlSeriesPopulares] = await Promise.all([
+  // 1. Hacemos las peticiones a los 4 enlaces
+  const [htmlPeliculasPopulares, htmlPeliculas, htmlSeriesPopulares, htmlSeries] = await Promise.all([
     fetchPage("/peliculas?orden=tendencias"),
-    fetchPage("/series?orden=tendencias")
+    fetchPage("/peliculas"),
+    fetchPage("/series?orden=tendencias"),
+    fetchPage("/series")
   ]);
 
-  // 2. Extraemos las tarjetas usando nuestra función mejorada
+  // 2. Extraemos las tarjetas de cada página descargada
   const peliculasPopulares = extractItems(htmlPeliculasPopulares, 20, false);
+  const peliculas = extractItems(htmlPeliculas, 20, false);
   const seriesPopulares = extractItems(htmlSeriesPopulares, 20, false);
+  const series = extractItems(htmlSeries, 20, false);
 
   const categories = [];
 
-  // 3. Construimos el Home solo con estas dos filas
+  // 3. Construimos el Home agregando cada fila en orden
   if (peliculasPopulares.length > 0) {
     categories.push({ 
       id: "peliculas-populares", 
-      title: "Películas Populares", 
+      title: "Películas en tendecia", 
       ref: "/peliculas?orden=tendencias", 
       items: peliculasPopulares 
+    });
+  }
+
+  if (peliculas.length > 0) {
+    categories.push({ 
+      id: "peliculas-catalogo", 
+      title: "Películas disponibles", 
+      ref: "/peliculas", 
+      items: peliculas 
     });
   }
 
   if (seriesPopulares.length > 0) {
     categories.push({ 
       id: "series-populares", 
-      title: "Series Populares", 
+      title: "Series en tendencia", 
       ref: "/series?orden=tendencias", 
       items: seriesPopulares 
+    });
+  }
+
+  if (series.length > 0) {
+    categories.push({ 
+      id: "series-catalogo", 
+      title: "Series disponibles", 
+      ref: "/series", 
+      items: series 
     });
   }
 
