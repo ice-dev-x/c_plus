@@ -154,9 +154,6 @@ function extractItems(html, limit = 20, isEpisode = false) {
   if (!html) return [];
   const items = [];
   const vistos = new Set();
-
-  // Si no queremos capturar el hero/slider horizontal como tarjeta de póster
-  // aislamos las secciones de listado o evitamos elementos tipo banner
   const aRegex = /<a[^>]+href="([^"]+(?:\/pelicula\/|\/serie\/)[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match;
 
@@ -171,22 +168,32 @@ function extractItems(html, limit = 20, isEpisode = false) {
 
     const innerHtml = match[2];
     
-    // Ignoramos enlaces que correspondan al botón o cabecera gigante del banner principal
-    if (innerHtml.includes("class=\"play-button\"") || innerHtml.includes("btn-play")) {
-      continue;
+    // 1. Extraer todas las imágenes disponibles en el bloque
+    const imgRegex = /(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/gi;
+    const foundImages = [];
+    let imgMatch;
+    while ((imgMatch = imgRegex.exec(innerHtml)) !== null) {
+      foundImages.push(imgMatch[1] || imgMatch[2]);
     }
 
-    const imgMatch = innerHtml.match(/(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/i);
-    const titleMatch = innerHtml.match(/<h2[^>]*>([^<]+)<\/h2>/i) || innerHtml.match(/alt="([^"]+)"/i);
+    // Si no hay imágenes, saltar al siguiente
+    if (foundImages.length === 0) continue;
 
-    if (imgMatch && titleMatch && !vistos.has(link)) {
+    // 2. Priorizar imágenes .jpg sobre .png para evitar logos transparentes
+    let imgUrl = foundImages.find(img => img.toLowerCase().includes(".jpg") || img.toLowerCase().includes(".jpeg")) || foundImages[0];
+
+    // 3. Forzar resolución a máxima calidad (Original) en TMDB
+    imgUrl = imgUrl.replace(/\/(w\d+|thumb)\//i, "/original/");
+    // Si la imagen usa miniaturas de WordPress, quitamos la compresión
+    imgUrl = imgUrl.replace(/-\d+x\d+\.(jpg|jpeg|png)$/i, ".$1");
+
+    const titleMatch = innerHtml.match(/<h[23][^>]*>([^<]+)<\/h[23]>/i) || innerHtml.match(/alt="([^"]+)"/i);
+
+    if (titleMatch && !vistos.has(link)) {
       vistos.add(link);
-      let imgUrl = imgMatch[1] || imgMatch[2];
+      
       if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
       if (imgUrl.startsWith("/")) imgUrl = BASE_URL + imgUrl;
-
-      // Obtener versión de mejor resolución si Cuevana usa miniaturas /w185/ o /w300/
-      imgUrl = imgUrl.replace(/\/w\d+\//i, "/w500/").replace(/\/thumb\//i, "/original/");
 
       const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
       
@@ -194,19 +201,11 @@ function extractItems(html, limit = 20, isEpisode = false) {
         id: "item-" + fullLink.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
         ref: fullLink,
         title: cleanText(titleMatch[1] || titleMatch[2]),
-        kind: link.includes("/serie/") ? "series" : "movie"
+        kind: link.includes("/serie/") ? "series" : "movie",
+        poster: imgUrl,
+        backdrop: imgUrl
       };
-
-      if (isEpisode) {
-        // En episodios la imagen original es horizontal (16:9 backdrop)
-        item.backdrop = imgUrl;
-        item.poster = imgUrl; // Kino usará backdrop si está en vista tarjeta
-      } else {
-        // En películas y series regulares es póster vertical
-        item.poster = imgUrl;
-        item.backdrop = imgUrl;
-      }
-
+      
       items.push(item);
     }
   }
