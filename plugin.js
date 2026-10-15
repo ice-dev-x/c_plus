@@ -37,9 +37,10 @@ export async function section({ tab }) {
   const rows = [];
 
   if (chosen === "pelis") {
-    const [htmlPopulares, htmlPeliculas, htmlEstrenos] = await Promise.all([
-      fetchPage("/peliculas?orden=tendencias"), fetchPage("/peliculas"), fetchPage("/")
-    
+    const [htmlTendencias, htmlPeliculas, htmlPopulares] = await Promise.all([
+      fetchPage("/peliculas?orden=tendencias"), 
+      fetchPage("/peliculas"), 
+      fetchPage("/peliculas?orden=populares")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
       fetchPage("/peliculas?genero=accion"), fetchPage("/peliculas?genero=comedia"),
@@ -50,9 +51,9 @@ export async function section({ tab }) {
       fetchPage("/peliculas?genero=suspenso"), fetchPage("/peliculas?genero=drama")
     ]);
 
-    const populares = extractItems(htmlPopulares, 20, false);
+    const tendencias = extractItems(htmlTendencias, 20, false);
     const peliculas = extractItems(htmlPeliculas, 20, false);
-    const estrenos = extractItems(htmlEstrenos, 20, false);
+    const populares = extractItems(htmlPopulares, 20, false);
     const accion = extractItems(htmlAccion, 20, false);
     const comedia = extractItems(htmlComedia, 20, false);
     const terror = extractItems(htmlTerror, 20, false);
@@ -62,24 +63,29 @@ export async function section({ tab }) {
     const suspenso = extractItems(htmlSuspenso, 20, false);
     const drama = extractItems(htmlDrama, 20, false);
 
-    if (populares.length > 0) heroItem = populares[0];
-    else if (estrenos.length > 0) heroItem = estrenos[0];
+    if (tendencias.length > 0) heroItem = tendencias[0];
+    else if (peliculas.length > 0) heroItem = peliculas[0];
 
-    if (populares.length > 0) rows.push({ id: "populares", title: "Películas Populares", ref: "/peliculas?orden=tendencias", items: populares });
-    //if (populares.length > 0) rows.push({ id: "populares", title: "⭐ Películas Populares", ref: "/tendencias", items: populares });
-    if (peliculas.length > 0) rows.push({ id: "peliculas", title: "🎬 Películas Agregadas", ref: "/peliculas", items: peliculas });
-    if (accion.length > 0) rows.push({ id: "accion", title: "💥 Acción", ref: "/peliculas?genero=accion", items: accion });
-    if (comedia.length > 0) rows.push({ id: "comedia", title: "😂 Comedia", ref: "/peliculas?genero=comedia", items: comedia });
-    if (terror.length > 0) rows.push({ id: "terror", title: "👻 Terror", ref: "/peliculas?genero=terror", items: terror });
-    if (animacion.length > 0) rows.push({ id: "animacion", title: "🎨 Animación", ref: "/peliculas?genero=animacion", items: animacion });
-    if (anime.length > 0) rows.push({ id: "anime", title: "🎌 Anime", ref: "/peliculas?genero=anime", items: anime });
-    if (cienciaFic.length > 0) rows.push({ id: "sci-fi", title: "🚀 Ciencia Ficción", ref: "/peliculas?genero=ciencia-ficcion", items: cienciaFic });
-    if (suspenso.length > 0) rows.push({ id: "suspenso", title: "🔍 Suspenso", ref: "/peliculas?genero=suspenso", items: suspenso });
-    if (drama.length > 0) rows.push({ id: "drama", title: "🎭 Drama", ref: "/peliculas?genero=drama", items: drama });
+    // Secciones principales sin emojis
+    if (tendencias.length > 0) rows.push({ id: "p-tendencias", title: "En tendencia", ref: "/peliculas?orden=tendencias", items: tendencias });
+    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas", ref: "/peliculas", items: peliculas });
+    if (populares.length > 0) rows.push({ id: "p-populares", title: "Mejor valoradas", ref: "/peliculas?orden=populares", items: populares });
+    
+    // Géneros sin emojis
+    if (accion.length > 0) rows.push({ id: "accion", title: "Acción", ref: "/peliculas?genero=accion", items: accion });
+    if (comedia.length > 0) rows.push({ id: "comedia", title: "Comedia", ref: "/peliculas?genero=comedia", items: comedia });
+    if (terror.length > 0) rows.push({ id: "terror", title: "Terror", ref: "/peliculas?genero=terror", items: terror });
+    if (animacion.length > 0) rows.push({ id: "animacion", title: "Animación", ref: "/peliculas?genero=animacion", items: animacion });
+    if (anime.length > 0) rows.push({ id: "anime", title: "Anime", ref: "/peliculas?genero=anime", items: anime });
+    if (cienciaFic.length > 0) rows.push({ id: "sci-fi", title: "Ciencia Ficción", ref: "/peliculas?genero=ciencia-ficcion", items: cienciaFic });
+    if (suspenso.length > 0) rows.push({ id: "suspenso", title: "Suspenso", ref: "/peliculas?genero=suspenso", items: suspenso });
+    if (drama.length > 0) rows.push({ id: "drama", title: "Drama", ref: "/peliculas?genero=drama", items: drama });
 
   } else if (chosen === "series") {
-    const [htmlSeries, htmlHome] = await Promise.all([
-      fetchPage("/series"), fetchPage("/")
+    const [htmlTendencias, htmlRecientes, htmlCatalogo] = await Promise.all([
+      fetchPage("/series?orden=tendencias"), 
+      fetchPage("/series?orden=recientes"),
+      fetchPage("/series")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
       fetchPage("/series?genero=accion"), fetchPage("/series?genero=comedia"),
@@ -90,8 +96,9 @@ export async function section({ tab }) {
       fetchPage("/series?genero=suspenso"), fetchPage("/series?genero=drama")
     ]);
 
-    const series = extractItems(htmlSeries, 20, false);
-    const episodios = extractItems(htmlHome, 20, true);
+    const tendencias = extractItems(htmlTendencias, 20, false);
+    const recientes = extractItems(htmlRecientes, 20, false);
+    const catalogo = extractItems(htmlCatalogo, 20, false);
     const accion = extractItems(htmlAccion, 20, false);
     const comedia = extractItems(htmlComedia, 20, false);
     const terror = extractItems(htmlTerror, 20, false);
@@ -101,26 +108,30 @@ export async function section({ tab }) {
     const suspenso = extractItems(htmlSuspenso, 20, false);
     const drama = extractItems(htmlDrama, 20, false);
 
-    if (series.length > 0) heroItem = series[0];
-    else if (episodios.length > 0) heroItem = episodios[0];
+    if (tendencias.length > 0) heroItem = tendencias[0];
+    else if (recientes.length > 0) heroItem = recientes[0];
 
-    if (series.length > 0) rows.push({ id: "series", title: "📺 Series Actualizadas", ref: "/series", items: series });
-    if (episodios.length > 0) rows.push({ id: "episodios", title: "🆕 Últimos Episodios", ref: "/?tipo=episodios", items: episodios });
-    if (accion.length > 0) rows.push({ id: "s-accion", title: "💥 Acción", ref: "/series?genero=accion", items: accion });
-    if (comedia.length > 0) rows.push({ id: "s-comedia", title: "😂 Comedia", ref: "/series?genero=comedia", items: comedia });
-    if (terror.length > 0) rows.push({ id: "s-terror", title: "👻 Terror", ref: "/series?genero=terror", items: terror });
-    if (animacion.length > 0) rows.push({ id: "s-animacion",title: "🎨 Animación", ref: "/series?genero=animacion",items: animacion });
-    if (anime.length > 0) rows.push({ id: "s-anime", title: "🎌 Anime", ref: "/series?genero=anime", items: anime });
-    if (cienciaFic.length > 0) rows.push({ id: "s-sci-fi", title: "🚀 Ciencia Ficción", ref: "/series?genero=ciencia-ficcion", items: cienciaFic });
-    if (suspenso.length > 0) rows.push({ id: "s-suspenso", title: "🔍 Suspenso", ref: "/series?genero=suspenso", items: suspenso });
-    if (drama.length > 0) rows.push({ id: "s-drama", title: "🎭 Drama", ref: "/series?genero=drama", items: drama });
+    // Secciones principales sin emojis
+    if (tendencias.length > 0) rows.push({ id: "s-tendencias", title: "Series en tendencia", ref: "/series?orden=tendencias", items: tendencias });
+    if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientes", ref: "/series?orden=recientes", items: recientes });
+    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo", ref: "/series", items: catalogo });
+    
+    // Géneros sin emojis
+    if (accion.length > 0) rows.push({ id: "s-accion", title: "Acción", ref: "/series?genero=accion", items: accion });
+    if (comedia.length > 0) rows.push({ id: "s-comedia", title: "Comedia", ref: "/series?genero=comedia", items: comedia });
+    if (terror.length > 0) rows.push({ id: "s-terror", title: "Terror", ref: "/series?genero=terror", items: terror });
+    if (animacion.length > 0) rows.push({ id: "s-animacion",title: "Animación", ref: "/series?genero=animacion",items: animacion });
+    if (anime.length > 0) rows.push({ id: "s-anime", title: "Anime", ref: "/series?genero=anime", items: anime });
+    if (cienciaFic.length > 0) rows.push({ id: "s-sci-fi", title: "Ciencia Ficción", ref: "/series?genero=ciencia-ficcion", items: cienciaFic });
+    if (suspenso.length > 0) rows.push({ id: "s-suspenso", title: "Suspenso", ref: "/series?genero=suspenso", items: suspenso });
+    if (drama.length > 0) rows.push({ id: "s-drama", title: "Drama", ref: "/series?genero=drama", items: drama });
   }
 
   let hero = { title: "Destacado", text: "Explora el mejor contenido disponible." };
   if (heroItem) {
     hero = {
       title: heroItem.title,
-      text: chosen === "series" ? "Disfruta de esta serie destacada." : "Disfruta de esta película destacada.",
+      text: chosen === "series" ? "Explora esta serie destacada en nuestro catálogo." : "Explora esta película destacada en nuestro catálogo.",
       image: heroItem.poster
     };
   }
