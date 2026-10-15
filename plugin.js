@@ -38,7 +38,8 @@ export async function section({ tab }) {
 
   if (chosen === "pelis") {
     const [htmlPopulares, htmlPeliculas, htmlEstrenos] = await Promise.all([
-      fetchPage("/tendencias"), fetchPage("/peliculas"), fetchPage("/")
+      fetchPage("/peliculas?orden=tendencias"), fetchPage("/peliculas"), fetchPage("/")
+    
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
       fetchPage("/peliculas?genero=accion"), fetchPage("/peliculas?genero=comedia"),
@@ -64,8 +65,8 @@ export async function section({ tab }) {
     if (populares.length > 0) heroItem = populares[0];
     else if (estrenos.length > 0) heroItem = estrenos[0];
 
-    if (estrenos.length > 0) rows.push({ id: "estrenos", title: "🔥 Estrenos Destacados", ref: "/", items: estrenos });
-    if (populares.length > 0) rows.push({ id: "populares", title: "⭐ Películas Populares", ref: "/tendencias", items: populares });
+    if (populares.length > 0) rows.push({ id: "populares", title: "Películas Populares", ref: "/peliculas?orden=tendencias", items: populares });
+    //if (populares.length > 0) rows.push({ id: "populares", title: "⭐ Películas Populares", ref: "/tendencias", items: populares });
     if (peliculas.length > 0) rows.push({ id: "peliculas", title: "🎬 Películas Agregadas", ref: "/peliculas", items: peliculas });
     if (accion.length > 0) rows.push({ id: "accion", title: "💥 Acción", ref: "/peliculas?genero=accion", items: accion });
     if (comedia.length > 0) rows.push({ id: "comedia", title: "😂 Comedia", ref: "/peliculas?genero=comedia", items: comedia });
@@ -167,15 +168,8 @@ function extractItems(html, limit = 20, isEpisode = false) {
     }
 
     const innerHtml = match[2];
-    
-    // 1. Ignorar el banner principal gigante de Cuevana.
-    // Al saltar el bloque que tiene el botón "Ver Película" o descripciones largas,
-    // obligamos al scraper a tomar la película desde la cuadrícula (donde tiene el póster vertical).
-    if (innerHtml.toLowerCase().includes("ver película") || innerHtml.includes("class=\"Description\"")) {
-      continue;
-    }
 
-    // 2. Extraer todas las imágenes disponibles en el bloque
+    // Extraer todas las imágenes disponibles en el bloque
     const imgRegex = /(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/gi;
     const foundImages = [];
     let imgMatch;
@@ -185,12 +179,16 @@ function extractItems(html, limit = 20, isEpisode = false) {
 
     if (foundImages.length === 0) continue;
 
-    // 3. Priorizar imágenes .jpg sobre .png para evitar logos transparentes
-    let imgUrl = foundImages.find(img => img.toLowerCase().includes(".jpg") || img.toLowerCase().includes(".jpeg")) || foundImages[0];
+    // Buscar EXCLUSIVAMENTE una imagen JPG o JPEG.
+    let imgUrl = foundImages.find(img => img.toLowerCase().includes(".jpg") || img.toLowerCase().includes(".jpeg"));
 
-    // 4. Forzar resolución a máxima calidad (Original) en TMDB
+    // EL FILTRO CLAVE: Si la imagen es un PNG (como el logo del banner principal) 
+    // ignoramos el elemento y dejamos que el scraper lo encuentre más abajo en la lista correcta.
+    if (!imgUrl) continue;
+
+    // Forzar resolución a máxima calidad (Original) en TMDB
     imgUrl = imgUrl.replace(/\/(w\d+|thumb)\//i, "/original/");
-    imgUrl = imgUrl.replace(/-\d+x\d+\.(jpg|jpeg|png)$/i, ".$1");
+    imgUrl = imgUrl.replace(/-\d+x\d+\.(jpg|jpeg)$/i, ".$1");
 
     const titleMatch = innerHtml.match(/<h[23][^>]*>([^<]+)<\/h[23]>/i) || innerHtml.match(/alt="([^"]+)"/i);
 
@@ -230,7 +228,7 @@ export async function home() {
     fetchPage("/"),
     fetchPage("/peliculas"),
     fetchPage("/series"),
-    fetchPage("/tendencias")
+    fetchPage("/peliculas?orden=tendencias")
   ]);
 
   const estrenos = extractItems(htmlHome, 20, false);
@@ -241,11 +239,11 @@ export async function home() {
 
   const categories = [];
 
-  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "🔥 Estrenos Destacados", ref: "/", items: estrenos });
-  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "🆕 Últimos Episodios", ref: "/?tipo=episodios", items: ultimosEpisodios });
-  if (populares.length > 0) categories.push({ id: "populares", title: "⭐ Películas Populares", ref: "/tendencias", items: populares });
-  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "🎬 Películas Agregadas", ref: "/peliculas", items: peliculas });
-  if (series.length > 0) categories.push({ id: "series", title: "📺 Series Actualizadas", ref: "/series", items: series });
+  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "Estrenos Destacados", ref: "/", items: estrenos });
+  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "Últimos Episodios", ref: "/?tipo=episodios", items: ultimosEpisodios });
+  if (populares.length > 0) categories.push({ id: "populares", title: "Películas Populares", ref: "peliculas?orden=tendencias", items: populares });
+  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "Películas Agregadas", ref: "/peliculas", items: peliculas });
+  if (series.length > 0) categories.push({ id: "series", title: "Series Actualizadas", ref: "/series", items: series });
 
   return categories;
 }
