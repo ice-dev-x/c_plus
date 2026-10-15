@@ -68,7 +68,7 @@ export async function section({ tab }) {
 
     // Secciones principales sin emojis
     if (tendencias.length > 0) rows.push({ id: "p-tendencias", title: "En tendencia", ref: "/peliculas?orden=tendencias", items: tendencias });
-    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas", ref: "/peliculas", items: peliculas });
+    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas disponibles", ref: "/peliculas", items: peliculas });
     if (populares.length > 0) rows.push({ id: "p-populares", title: "Mejor valoradas", ref: "/peliculas?orden=populares", items: populares });
     
     // Géneros sin emojis
@@ -114,7 +114,7 @@ export async function section({ tab }) {
     // Secciones principales sin emojis
     if (tendencias.length > 0) rows.push({ id: "s-tendencias", title: "Series en tendencia", ref: "/series?orden=tendencias", items: tendencias });
     if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientes", ref: "/series?orden=recientes", items: recientes });
-    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo", ref: "/series", items: catalogo });
+    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Series disponibles", ref: "/series", items: catalogo });
     
     // Géneros sin emojis
     if (accion.length > 0) rows.push({ id: "s-accion", title: "Acción", ref: "/series?genero=accion", items: accion });
@@ -434,16 +434,27 @@ export async function episodes(ref) {
     }
   }
 
-  if (episodesList.length === 0) {
-    episodesList.push({ season: 1, number: 1, ref: ref, title: "Reproducir Película" });
-  }
+  // Detectamos si es película basándonos en si tiene temporadas
+  const isMovie = seasonLinks.length === 0;
 
-  episodesList.sort((a, b) => (a.season - b.season) || (a.number - b.number));
+  if (isMovie) {
+    episodesList.push({ season: 1, number: 1, ref: ref, title: "Reproducir Película" });
+  } else {
+    episodesList.sort((a, b) => (a.season - b.season) || (a.number - b.number));
+  }
 
   const result = { episodes: episodesList };
 
   if (Object.keys(metadata).length > 0) {
-    result.series = metadata;
+    // Si es película, se lo asignamos a result.movie. Si es serie, a result.series.
+    if (isMovie) {
+      result.movie = metadata;
+    } else {
+      result.series = metadata;
+    }
+    
+    // Por compatibilidad con algunas versiones de Kino, también lo exponemos globalmente
+    result.metadata = metadata;
   }
 
   return result;
