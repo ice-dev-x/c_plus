@@ -224,26 +224,36 @@ export async function home() {
     } catch (e) { return ""; }
   };
 
-  const [htmlHome, htmlPeliculas, htmlSeries, htmlPopulares] = await Promise.all([
-    fetchPage("/"),
-    fetchPage("/peliculas"),
-    fetchPage("/series"),
-    fetchPage("/peliculas?orden=tendencias")
+  // 1. Hacemos las peticiones únicamente a los links que elegiste
+  const [htmlPeliculasPopulares, htmlSeriesPopulares] = await Promise.all([
+    fetchPage("/peliculas?orden=tendencias"),
+    fetchPage("/series?orden=tendencias")
   ]);
 
-  const estrenos = extractItems(htmlHome, 20, false);
-  const ultimosEpisodios = extractItems(htmlHome, 20, true);
-  const peliculas = extractItems(htmlPeliculas, 20, false);
-  const series = extractItems(htmlSeries, 20, false);
-  const populares = extractItems(htmlPopulares, 20, false);
+  // 2. Extraemos las tarjetas usando nuestra función mejorada
+  const peliculasPopulares = extractItems(htmlPeliculasPopulares, 20, false);
+  const seriesPopulares = extractItems(htmlSeriesPopulares, 20, false);
 
   const categories = [];
 
-  if (estrenos.length > 0) categories.push({ id: "estrenos", title: "Estrenos Destacados", ref: "/", items: estrenos });
-  if (ultimosEpisodios.length > 0) categories.push({ id: "episodios", title: "Últimos Episodios", ref: "/?tipo=episodios", items: ultimosEpisodios });
-  if (populares.length > 0) categories.push({ id: "populares", title: "Películas Populares", ref: "peliculas?orden=tendencias", items: populares });
-  if (peliculas.length > 0) categories.push({ id: "peliculas", title: "Películas Agregadas", ref: "/peliculas", items: peliculas });
-  if (series.length > 0) categories.push({ id: "series", title: "Series Actualizadas", ref: "/series", items: series });
+  // 3. Construimos el Home solo con estas dos filas
+  if (peliculasPopulares.length > 0) {
+    categories.push({ 
+      id: "peliculas-populares", 
+      title: "Películas Populares", 
+      ref: "/peliculas?orden=tendencias", 
+      items: peliculasPopulares 
+    });
+  }
+
+  if (seriesPopulares.length > 0) {
+    categories.push({ 
+      id: "series-populares", 
+      title: "Series Populares", 
+      ref: "/series?orden=tendencias", 
+      items: seriesPopulares 
+    });
+  }
 
   return categories;
 }
