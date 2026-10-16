@@ -370,12 +370,21 @@ export async function episodes(ref) {
 
   const metadata = {};
 
-  const descMatch = html.match(/class="Description"[^>]*>([\s\S]*?)<\/div>/i) || html.match(/<p[^>]*>\s*([^<]{30,})\s*<\/p>/i);
+  // 1. Extracción de sinopsis con fallback a og:description (igual que en LaMovie)
+  const descMatch = html.match(/<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"/i) ||
+                    html.match(/<meta\s+name="description"\s+content="([^"]+)"/i) ||
+                    html.match(/class="Description"[^>]*>([\s\S]*?)<\/div>/i) ||
+                    html.match(/<p[^>]*>\s*([^<]{30,})\s*<\/p>/i);
+
   if (descMatch) metadata.overview = cleanText(descMatch[1]);
 
-  const voteMatch = html.match(/<span[^>]+class="Num"[^>]*>([\d.]+)<\/span>/i) || html.match(/class="Vote"[^>]*>\s*([\d.]+)\s*</i) || html.match(/class="AAIco-star"[^>]*>.*?<\/i>\s*([\d.]+)/i);
+  // 2. Calificación / Votos
+  const voteMatch = html.match(/<span[^>]+class="Num"[^>]*>([\d.]+)<\/span>/i) || 
+                    html.match(/class="Vote"[^>]*>\s*([\d.]+)\s*</i) || 
+                    html.match(/class="AAIco-star"[^>]*>.*?<\/i>\s*([\d.]+)/i);
   if (voteMatch) metadata.rating = parseFloat(voteMatch[1]);
 
+  // 3. Géneros
   const gRegex = /<a[^>]+href="[^"]*genero[^"]*"[^>]*>\s*([^<]+)\s*<\/a>/gi;
   let gm;
   const genres = [];
@@ -384,25 +393,32 @@ export async function episodes(ref) {
   }
   if (genres.length > 0) metadata.genres = [...new Set(genres)];
 
-  const yearMatch = html.match(/class="Date"[^>]*>\s*(\d{4})\s*</i) ||
-    html.match(/>(19\d{2}|20\d{2})<\/(?:span|p|a)>/i) ||
-    html.match(/Estreno:\s*(\d{4})/i) ||
-    html.match(/<span class="Year">(\d{4})<\/span>/i);
+  // 4. Año de estreno
+  const titleMatch = html.match(/<meta\s+(?:property|name)="og:title"\s+content="([^"]+)"/i);
+  const yearInTitle = titleMatch ? titleMatch[1].match(/\((\d{4})\)/) : null;
+
+  const yearMatch = yearInTitle ||
+                    html.match(/class="Date"[^>]*>\s*(\d{4})\s*</i) ||
+                    html.match(/Estreno:\s*(\d{4})/i) ||
+                    html.match(/<span class="Year">(\d{4})<\/span>/i);
   if (yearMatch) metadata.year = parseInt(yearMatch[1], 10);
 
+  // 5. Imagen de fondo / Backdrop en alta definición
   const bgMatch = html.match(/<meta\s+(?:property|name)="og:image"\s+content="([^"]+)"/i) ||
-    html.match(/background-image:\s*url\((['"]?)([^)'"d]+)\1\)/i) ||
-    html.match(/<img[^>]+class="[^"]*lazy[^"]*"[^>]+data-src="([^"]+)"/i);
+                  html.match(/background-image:\s*url\((['"]?)([^)'"]+)\1\)/i);
 
   if (bgMatch) {
     let bUrl = bgMatch[1] || bgMatch[2];
     if (bUrl && !bUrl.startsWith('data:')) {
       if (bUrl.startsWith('//')) bUrl = 'https:' + bUrl;
       else if (bUrl.startsWith('/')) bUrl = BASE_URL + bUrl;
+      bUrl = bUrl.replace(/\/(w\d+|thumb)\//i, "/original/");
       metadata.backdrop = bUrl;
+      metadata.poster = bUrl;
     }
   }
 
+  // 6. Detección de temporadas
   const seasonRegex = /<a[^>]+href="([^"]+\/temporada-\d+)"/gi;
   const seasonLinks = [];
   let sMatch;
@@ -436,15 +452,15 @@ export async function episodes(ref) {
           number = parseInt(numMatch[2], 10);
         }
 
-        const titleMatch = epMatch[2].match(/<span[^>]*>([^<]+)<\/span>/i) || epMatch[2].match(/alt="([^"]+)"/i);
+        const epTitleMatch = epMatch[2].match(/<span[^>]*>([^<]+)<\/span>/i) || epMatch[2].match(/alt="([^"]+)"/i);
         const imgMatch = epMatch[2].match(/src=(?:"([^"]+)"|([^ >]+))/i);
 
         let still = imgMatch ? (imgMatch[1] || imgMatch[2]) : null;
         if (still && still.startsWith("//")) still = "https:" + still;
+        if (still) still = still.replace(/\/(w\d+|thumb)\//i, "/original/");
 
-        let rawTitle = titleMatch ? cleanText(titleMatch[1] || titleMatch[2]) : "";
+        let rawTitle = epTitleMatch ? cleanText(epTitleMatch[1] || epTitleMatch[2]) : "";
         let epTitle = `Episodio ${number}`;
-
         if (rawTitle && isNaN(rawTitle) && !rawTitle.toLowerCase().includes("episodio")) {
           epTitle = rawTitle;
         }
@@ -456,30 +472,28 @@ export async function episodes(ref) {
     }
   }
 
-  // Detectamos si es película basándonos en si tiene temporadas
   const isMovie = seasonLinks.length === 0;
 
   if (isMovie) {
-    episodesList.push({ season: 1, number: 1, ref: ref, title: "Reproducir Película" });
+    // Si es película, colocamos el overview directamente en el episodio reproducible
+    episodesList.push({
+      season: 1,
+      number: 1,
+      ref: ref,
+      title: "Reproducir Película",
+      overview: metadata.overview || ""
+    });
   } else {
     episodesList.sort((a, b) => (a.season - b.season) || (a.number - b.number));
   }
 
-  const result = { episodes: episodesList };
-
-  if (Object.keys(metadata).length > 0) {
-    // Si es película, se lo asignamos a result.movie. Si es serie, a result.series.
-    if (isMovie) {
-      result.movie = metadata;
-    } else {
-      result.series = metadata;
-    }
-    
-    // Por compatibilidad con algunas versiones de Kino, también lo exponemos globalmente
-    result.metadata = metadata;
-  }
-
-  return result;
+  // Devolvemos la metadata expuesta bajo todas las claves posibles que Kino consume
+  return {
+    overview: metadata.overview || "",
+    movie: metadata,
+    series: metadata,
+    episodes: episodesList
+  };
 }
 
 export async function resolve(ref) {
