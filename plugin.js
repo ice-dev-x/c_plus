@@ -37,9 +37,11 @@ export async function section({ tab }) {
   const rows = [];
 
   if (chosen === "pelis") {
-    const [htmlTendencias, htmlPeliculas, htmlPopulares] = await Promise.all([
-      fetchPage("/peliculas?orden=tendencias"), 
-      fetchPage("/peliculas"), 
+    // Añadimos la petición de recientes para las películas
+    const [htmlTendencias, htmlRecientes, htmlPeliculas, htmlPopulares] = await Promise.all([
+      fetchPage("/peliculas?orden=tendencias"),
+      fetchPage("/peliculas?orden=recientes"),
+      fetchPage("/peliculas"),
       fetchPage("/peliculas?orden=populares")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
@@ -52,6 +54,7 @@ export async function section({ tab }) {
     ]);
 
     const tendencias = extractItems(htmlTendencias, 20, false);
+    const recientes = extractItems(htmlRecientes, 20, false); // Extraemos las recientes
     const peliculas = extractItems(htmlPeliculas, 20, false);
     const populares = extractItems(htmlPopulares, 20, false);
     const accion = extractItems(htmlAccion, 20, false);
@@ -64,14 +67,16 @@ export async function section({ tab }) {
     const drama = extractItems(htmlDrama, 20, false);
 
     if (tendencias.length > 0) heroItem = tendencias[0];
-    else if (peliculas.length > 0) heroItem = peliculas[0];
+    else if (recientes.length > 0) heroItem = recientes[0];
 
-    // Secciones principales sin emojis
+    // Secciones principales ordenadas
     if (tendencias.length > 0) rows.push({ id: "p-tendencias", title: "En tendencia", ref: "/peliculas?orden=tendencias", items: tendencias });
-    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas disponibles", ref: "/peliculas", items: peliculas });
+    // Añadimos la fila de Recientemente añadidos justo debajo de tendencias
+    if (recientes.length > 0) rows.push({ id: "p-recientes", title: "Recientemente añadidos", ref: "/peliculas?orden=recientes", items: recientes });
+    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas", ref: "/peliculas", items: peliculas });
     if (populares.length > 0) rows.push({ id: "p-populares", title: "Mejor valoradas", ref: "/peliculas?orden=populares", items: populares });
     
-    // Géneros sin emojis
+    // Géneros
     if (accion.length > 0) rows.push({ id: "accion", title: "Acción", ref: "/peliculas?genero=accion", items: accion });
     if (comedia.length > 0) rows.push({ id: "comedia", title: "Comedia", ref: "/peliculas?genero=comedia", items: comedia });
     if (terror.length > 0) rows.push({ id: "terror", title: "Terror", ref: "/peliculas?genero=terror", items: terror });
@@ -111,12 +116,12 @@ export async function section({ tab }) {
     if (tendencias.length > 0) heroItem = tendencias[0];
     else if (recientes.length > 0) heroItem = recientes[0];
 
-    // Secciones principales sin emojis
+    // Secciones principales ordenadas (cambiamos el título a "Recientemente añadidos")
     if (tendencias.length > 0) rows.push({ id: "s-tendencias", title: "Series en tendencia", ref: "/series?orden=tendencias", items: tendencias });
-    if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientes", ref: "/series?orden=recientes", items: recientes });
-    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Series disponibles", ref: "/series", items: catalogo });
+    if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientemente añadidos", ref: "/series?orden=recientes", items: recientes });
+    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo", ref: "/series", items: catalogo });
     
-    // Géneros sin emojis
+    // Géneros
     if (accion.length > 0) rows.push({ id: "s-accion", title: "Acción", ref: "/series?genero=accion", items: accion });
     if (comedia.length > 0) rows.push({ id: "s-comedia", title: "Comedia", ref: "/series?genero=comedia", items: comedia });
     if (terror.length > 0) rows.push({ id: "s-terror", title: "Terror", ref: "/series?genero=terror", items: terror });
@@ -370,14 +375,15 @@ export async function episodes(ref) {
 
   const metadata = {};
 
-  // 1. Extracción de sinopsis con fallback a og:description (igual que en LaMovie)
-  const descMatch = html.match(/<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"/i) ||
-                    html.match(/<meta\s+name="description"\s+content="([^"]+)"/i) ||
+// 1. Extracción de sinopsis precisa basada en la estructura de Cuevana
+  const descMatch = html.match(/<div[^>]*class="backdrop-info"[^>]*>[\s\S]*?<p>([\s\S]*?)<\/p>/i) ||
+                    html.match(/<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"/i) ||
                     html.match(/class="Description"[^>]*>([\s\S]*?)<\/div>/i) ||
-                    html.match(/<p[^>]*>\s*([^<]{30,})\s*<\/p>/i);
+                    html.match(/<p[^>]*>\s*([^<]{50,})\s*<\/p>/i);
 
-  if (descMatch) metadata.overview = cleanText(descMatch[1]);
-
+  if (descMatch) {
+    metadata.overview = cleanText(descMatch[1]);
+  }
   // 2. Calificación / Votos
   const voteMatch = html.match(/<span[^>]+class="Num"[^>]*>([\d.]+)<\/span>/i) || 
                     html.match(/class="Vote"[^>]*>\s*([\d.]+)\s*</i) || 
