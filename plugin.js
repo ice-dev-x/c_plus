@@ -25,15 +25,11 @@ export async function section({ tab }) {
 
   const chosen = tabs.some((t) => t.id === tab) ? tab : "pelis";
 
-const fetchPage = async (path) => {
+  const fetchPage = async (path) => {
     try {
-      // Truco Anti-Caché: Forzamos a Cuevana a entregar la versión más reciente
-      let cacheBusterPath = path;
-      if (!path.includes("?")) {
-        cacheBusterPath += "??"; // Usamos tu descubrimiento para las rutas limpias (/series, /peliculas)
-      } else {
-        cacheBusterPath += `&nocache=${Date.now()}`; // Si ya tiene un '?', le agregamos un número único para romper el caché
-      }
+      // Truco Anti-Caché 100% seguro: Usamos un parámetro estándar que el servidor no bloquea
+      const separator = path.includes("?") ? "&" : "?";
+      const cacheBusterPath = `${path}${separator}nocache=${Date.now()}`;
 
       const res = await kino.fetch(`${BASE_URL}${cacheBusterPath}`, { headers: { "User-Agent": "Mozilla/5.0" } });
       if (!res.ok) return "";
@@ -45,11 +41,9 @@ const fetchPage = async (path) => {
   const rows = [];
 
   if (chosen === "pelis") {
-    // Añadimos la petición de recientes para las películas
-    const [htmlTendencias, htmlRecientes, htmlPeliculas, htmlPopulares] = await Promise.all([
+    const [htmlTendencias, htmlPeliculas, htmlPopulares] = await Promise.all([
       fetchPage("/peliculas?orden=tendencias"),
-      fetchPage("/peliculas?orden=recientes"),
-      fetchPage("/peliculas"),
+      fetchPage("/peliculas"), // Ahora cargará correctamente sin el ?? problemático
       fetchPage("/peliculas?orden=populares")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
@@ -62,7 +56,6 @@ const fetchPage = async (path) => {
     ]);
 
     const tendencias = extractItems(htmlTendencias, 20, false);
-    const recientes = extractItems(htmlRecientes, 20, false); // Extraemos las recientes
     const peliculas = extractItems(htmlPeliculas, 20, false);
     const populares = extractItems(htmlPopulares, 20, false);
     const accion = extractItems(htmlAccion, 20, false);
@@ -75,16 +68,12 @@ const fetchPage = async (path) => {
     const drama = extractItems(htmlDrama, 20, false);
 
     if (tendencias.length > 0) heroItem = tendencias[0];
-    else if (recientes.length > 0) heroItem = recientes[0];
+    else if (peliculas.length > 0) heroItem = peliculas[0];
 
-    // Secciones principales ordenadas
     if (tendencias.length > 0) rows.push({ id: "p-tendencias", title: "En tendencia", ref: "/peliculas?orden=tendencias", items: tendencias });
-    // Añadimos la fila de Recientemente añadidos justo debajo de tendencias
-    if (recientes.length > 0) rows.push({ id: "p-recientes", title: "Recientemente añadidos", ref: "/peliculas??orden=recientes", items: recientes });
-    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas", ref: "/peliculas", items: peliculas });
+    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Catálogo completo", ref: "/peliculas", items: peliculas });
     if (populares.length > 0) rows.push({ id: "p-populares", title: "Mejor valoradas", ref: "/peliculas?orden=populares", items: populares });
     
-    // Géneros
     if (accion.length > 0) rows.push({ id: "accion", title: "Acción", ref: "/peliculas?genero=accion", items: accion });
     if (comedia.length > 0) rows.push({ id: "comedia", title: "Comedia", ref: "/peliculas?genero=comedia", items: comedia });
     if (terror.length > 0) rows.push({ id: "terror", title: "Terror", ref: "/peliculas?genero=terror", items: terror });
@@ -95,10 +84,10 @@ const fetchPage = async (path) => {
     if (drama.length > 0) rows.push({ id: "drama", title: "Drama", ref: "/peliculas?genero=drama", items: drama });
 
   } else if (chosen === "series") {
-    const [htmlTendencias, htmlRecientes, htmlCatalogo] = await Promise.all([
+    const [htmlTendencias, htmlCatalogo, htmlPopulares] = await Promise.all([
       fetchPage("/series?orden=tendencias"), 
-      fetchPage("/series?orden=recientes"),
-      fetchPage("/series")
+      fetchPage("/series"),
+      fetchPage("/series?orden=populares")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
       fetchPage("/series?genero=accion"), fetchPage("/series?genero=comedia"),
@@ -110,8 +99,8 @@ const fetchPage = async (path) => {
     ]);
 
     const tendencias = extractItems(htmlTendencias, 20, false);
-    const recientes = extractItems(htmlRecientes, 20, false);
     const catalogo = extractItems(htmlCatalogo, 20, false);
+    const populares = extractItems(htmlPopulares, 20, false);
     const accion = extractItems(htmlAccion, 20, false);
     const comedia = extractItems(htmlComedia, 20, false);
     const terror = extractItems(htmlTerror, 20, false);
@@ -122,14 +111,12 @@ const fetchPage = async (path) => {
     const drama = extractItems(htmlDrama, 20, false);
 
     if (tendencias.length > 0) heroItem = tendencias[0];
-    else if (recientes.length > 0) heroItem = recientes[0];
+    else if (catalogo.length > 0) heroItem = catalogo[0];
 
-    // Secciones principales ordenadas (cambiamos el título a "Recientemente añadidos")
     if (tendencias.length > 0) rows.push({ id: "s-tendencias", title: "Series en tendencia", ref: "/series?orden=tendencias", items: tendencias });
-    if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientemente añadidos", ref: "/series?orden=recientes", items: recientes });
-    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo", ref: "/series", items: catalogo });
+    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo completo", ref: "/series", items: catalogo });
+    if (populares.length > 0) rows.push({ id: "s-populares", title: "Mejor valoradas", ref: "/series?orden=populares", items: populares });
     
-    // Géneros
     if (accion.length > 0) rows.push({ id: "s-accion", title: "Acción", ref: "/series?genero=accion", items: accion });
     if (comedia.length > 0) rows.push({ id: "s-comedia", title: "Comedia", ref: "/series?genero=comedia", items: comedia });
     if (terror.length > 0) rows.push({ id: "s-terror", title: "Terror", ref: "/series?genero=terror", items: terror });
@@ -150,6 +137,72 @@ const fetchPage = async (path) => {
   }
 
   return { tabs, tab: chosen, hero, rows };
+}
+
+
+function extractItems(html, limit = 20, isEpisode = false) {
+  if (!html) return [];
+  const items = [];
+  const vistos = new Set();
+  const aRegex = /<a[^>]+href="([^"]+(?:\/pelicula\/|\/serie\/)[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+
+  while ((match = aRegex.exec(html)) !== null && items.length < limit) {
+    let link = match[1];
+    if (isEpisode) {
+      if (!link.includes("episodio")) continue;
+      link = link.replace(/\/episodio-\d+x\d+/i, "");
+    } else {
+      if (link.includes("episodio")) continue;
+    }
+
+    const innerHtml = match[2];
+
+    if (innerHtml.toLowerCase().includes("ver película") || innerHtml.includes('class="Description"')) {
+      continue;
+    }
+
+    const imgRegex = /(?:src|data-src|data-lazy)=(?:"([^"]+)"|([^ >]+))/gi;
+    const foundImages = [];
+    let imgMatch;
+    while ((imgMatch = imgRegex.exec(innerHtml)) !== null) {
+      foundImages.push(imgMatch[1] || imgMatch[2]);
+    }
+
+    if (foundImages.length === 0) continue;
+
+    // FILTRO ESTRICTO: Solo aceptamos webp, jpg o jpeg. Si no lo es (ej. logo.png), se descarta el bloque completo.
+    let imgUrl = foundImages.find(img => img.match(/\.(jpg|jpeg|webp)/i));
+    
+    // Si no es un formato válido de póster, ignoramos y pasamos al siguiente.
+    if (!imgUrl) continue;
+
+    imgUrl = imgUrl.replace(/\/(w\d+|thumb)\//i, "/original/");
+    imgUrl = imgUrl.replace(/-\d+x\d+\.(jpg|jpeg|webp)$/i, ".$1");
+
+    const titleMatch = innerHtml.match(/<h[23][^>]*>([^<]+)<\/h[23]>/i) || innerHtml.match(/alt="([^"]+)"/i);
+
+    if (titleMatch && !vistos.has(link)) {
+      vistos.add(link);
+      
+      if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
+      if (imgUrl.startsWith("/")) imgUrl = BASE_URL + imgUrl;
+
+      const fullLink = link.startsWith("http") ? link : `${BASE_URL}${link}`;
+      
+      const item = {
+        id: "item-" + fullLink.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, ""),
+        ref: fullLink,
+        title: cleanText(titleMatch[1] || titleMatch[2]),
+        kind: link.includes("/serie/") ? "series" : "movie",
+        poster: imgUrl,
+        backdrop: imgUrl
+      };
+      
+      items.push(item);
+    }
+  }
+  return items;
 }
 
 function base64Decode(str) {
