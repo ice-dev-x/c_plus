@@ -13,7 +13,7 @@ function cleanText(text) {
     .trim();
 
   result = result.replace(/^Serie\s+/i, "SERIE: ");
-  result = result.replace(/^Pel[ií]cula\s+/i, "PELÍCULA: ");
+  result = result.replace(/^Pel[ií]cula\s+/i, "PELICULA: ");
   return result;
 }
 
@@ -40,8 +40,8 @@ export async function section({ tab }) {
     // Añadimos la petición de recientes para las películas
     const [htmlTendencias, htmlRecientes, htmlPeliculas, htmlPopulares] = await Promise.all([
       fetchPage("/peliculas?orden=tendencias"),
-      fetchPage("/peliculas?orden=recientes"),
-      fetchPage("/peliculas"),
+      //fetchPage("/peliculas?orden=recientes"),
+      fetchPage("/peliculas?"),
       fetchPage("/peliculas?orden=populares")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
@@ -72,8 +72,8 @@ export async function section({ tab }) {
     // Secciones principales ordenadas
     if (tendencias.length > 0) rows.push({ id: "p-tendencias", title: "En tendencia", ref: "/peliculas?orden=tendencias", items: tendencias });
     // Añadimos la fila de Recientemente añadidos justo debajo de tendencias
-    if (recientes.length > 0) rows.push({ id: "p-recientes", title: "Recientemente añadidos", ref: "/peliculas?orden=recientes", items: recientes });
-    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas", ref: "/peliculas", items: peliculas });
+   // if (recientes.length > 0) rows.push({ id: "p-recientes", title: "Recientemente añadidos", ref: "/peliculas??orden=recientes", items: recientes });
+    if (peliculas.length > 0) rows.push({ id: "p-peliculas", title: "Películas", ref: "/peliculas?", items: peliculas });
     if (populares.length > 0) rows.push({ id: "p-populares", title: "Mejor valoradas", ref: "/peliculas?orden=populares", items: populares });
     
     // Géneros
@@ -89,8 +89,8 @@ export async function section({ tab }) {
   } else if (chosen === "series") {
     const [htmlTendencias, htmlRecientes, htmlCatalogo] = await Promise.all([
       fetchPage("/series?orden=tendencias"), 
-      fetchPage("/series?orden=recientes"),
-      fetchPage("/series")
+      //fetchPage("/series?orden=recientes"),
+      fetchPage("/series??")
     ]);
     const [htmlAccion, htmlComedia, htmlTerror, htmlAnimacion] = await Promise.all([
       fetchPage("/series?genero=accion"), fetchPage("/series?genero=comedia"),
@@ -118,8 +118,8 @@ export async function section({ tab }) {
 
     // Secciones principales ordenadas (cambiamos el título a "Recientemente añadidos")
     if (tendencias.length > 0) rows.push({ id: "s-tendencias", title: "Series en tendencia", ref: "/series?orden=tendencias", items: tendencias });
-    if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientemente añadidos", ref: "/series?orden=recientes", items: recientes });
-    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo", ref: "/series", items: catalogo });
+   // if (recientes.length > 0) rows.push({ id: "s-recientes", title: "Recientemente añadidos", ref: "/series?orden=recientes", items: recientes });
+    if (catalogo.length > 0) rows.push({ id: "s-catalogo", title: "Catálogo", ref: "/series??", items: catalogo });
     
     // Géneros
     if (accion.length > 0) rows.push({ id: "s-accion", title: "Acción", ref: "/series?genero=accion", items: accion });
@@ -270,7 +270,7 @@ export async function home() {
     categories.push({ 
       id: "peliculas-catalogo", 
       title: "Películas disponibles", 
-      ref: "/peliculas", 
+      ref: "/peliculas?", 
       items: peliculas 
     });
   }
@@ -288,7 +288,7 @@ export async function home() {
     categories.push({ 
       id: "series-catalogo", 
       title: "Series disponibles", 
-      ref: "/series", 
+      ref: "/series??", 
       items: series 
     });
   }
@@ -375,15 +375,26 @@ export async function episodes(ref) {
 
   const metadata = {};
 
-// 1. Extracción de sinopsis precisa basada en la estructura de Cuevana
-  const descMatch = html.match(/<div[^>]*class="backdrop-info"[^>]*>[\s\S]*?<p>([\s\S]*?)<\/p>/i) ||
-                    html.match(/<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"/i) ||
-                    html.match(/class="Description"[^>]*>([\s\S]*?)<\/div>/i) ||
-                    html.match(/<p[^>]*>\s*([^<]{50,})\s*<\/p>/i);
+  // 1. Extracción de sinopsis ultra precisa usando múltiples métodos de respaldo
+  const overviewRegexes = [
+    /<h1[^>]*class="[^"]*page-title-hero[^"]*"[^>]*>[\s\S]*?<\/h1>\s*<p>([\s\S]*?)<\/p>/i,
+    /<div[^>]*class="[^"]*backdrop-info[^"]*"[^>]*>[\s\S]*?<p>([\s\S]*?)<\/p>/i,
+    /<meta\s+(?:property|name)="og:description"\s+content="([^"]+)"/i,
+    /<meta\s+name="description"\s+content="([^"]+)"/i,
+    /class="Description"[^>]*>([\s\S]*?)<\/div>/i
+  ];
 
-  if (descMatch) {
-    metadata.overview = cleanText(descMatch[1]);
+  for (let reg of overviewRegexes) {
+    const match = html.match(reg);
+    if (match && match[1]) {
+      const text = cleanText(match[1]);
+      if (text.length > 15) { // Validamos que no sea un texto vacío
+        metadata.overview = text;
+        break;
+      }
+    }
   }
+
   // 2. Calificación / Votos
   const voteMatch = html.match(/<span[^>]+class="Num"[^>]*>([\d.]+)<\/span>/i) || 
                     html.match(/class="Vote"[^>]*>\s*([\d.]+)\s*</i) || 
@@ -481,7 +492,7 @@ export async function episodes(ref) {
   const isMovie = seasonLinks.length === 0;
 
   if (isMovie) {
-    // Si es película, colocamos el overview directamente en el episodio reproducible
+    // Inject overview strictly in the episode object
     episodesList.push({
       season: 1,
       number: 1,
@@ -493,12 +504,10 @@ export async function episodes(ref) {
     episodesList.sort((a, b) => (a.season - b.season) || (a.number - b.number));
   }
 
-  // Devolvemos la metadata expuesta bajo todas las claves posibles que Kino consume
-  return {
-    overview: metadata.overview || "",
-    movie: metadata,
-    series: metadata,
-    episodes: episodesList
+  // Igualamos el comportamiento EXACTO del plugin de LaMovie
+  return { 
+    series: metadata, 
+    episodes: episodesList 
   };
 }
 
