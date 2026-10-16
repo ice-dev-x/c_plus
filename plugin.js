@@ -479,20 +479,27 @@ export async function episodes(ref) {
       season: 1,
       number: 1,
       ref: ref,
-      title: "Reproducir Película",
+      title: "Reproducir",
       overview: metadata.overview || ""
     });
   } else {
     episodesList.sort((a, b) => (a.season - b.season) || (a.number - b.number));
   }
 
+  // --- EL TRUCO FINAL ---
+  // Si es película, le mandamos a Kino un objeto "movie". Si es serie, un objeto "series".
+  const result = { episodes: episodesList };
+
   // Devolvemos la metadata expuesta bajo todas las claves posibles que Kino consume
-  return {
-    overview: metadata.overview || "",
-    movie: metadata,
-    series: metadata,
-    episodes: episodesList
-  };
+if (isMovie) {
+    result.movie = metadata;
+    // Por si acaso Kino espera la data en la raíz en versiones antiguas:
+    result.overview = metadata.overview || ""; 
+  } else {
+    result.series = metadata;
+  }
+
+  return result;
 }
 
 export async function resolve(ref) {
