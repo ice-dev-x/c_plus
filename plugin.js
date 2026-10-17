@@ -227,13 +227,17 @@ function extractItems(html, limit = 20, isEpisode = false) {
 export async function home() {
   const fetchPage = async (path) => {
     try {
-      const res = await kino.fetch(`${BASE_URL}${path}`, { headers: { "User-Agent": "Mozilla/5.0" } });
+      // El mismo Truco Anti-Caché seguro que usamos en section
+      const separator = path.includes("?") ? "&" : "?";
+      const cacheBusterPath = `${path}${separator}nocache=${Date.now()}`;
+
+      const res = await kino.fetch(`${BASE_URL}${cacheBusterPath}`, { headers: { "User-Agent": "Mozilla/5.0" } });
       if (!res.ok) return "";
       return await res.text();
     } catch (e) { return ""; }
   };
 
-  // 1. Hacemos las peticiones a los 4 enlaces
+  // 1. Hacemos las peticiones a los 4 enlaces reales
   const [htmlPeliculasPopulares, htmlPeliculas, htmlSeriesPopulares, htmlSeries] = await Promise.all([
     fetchPage("/peliculas?orden=tendencias"),
     fetchPage("/peliculas"),
@@ -253,7 +257,7 @@ export async function home() {
   if (peliculasPopulares.length > 0) {
     categories.push({ 
       id: "peliculas-populares", 
-      title: "Películas en tendecia", 
+      title: "Películas en tendencia", 
       ref: "/peliculas?orden=tendencias", 
       items: peliculasPopulares 
     });
@@ -263,7 +267,7 @@ export async function home() {
     categories.push({ 
       id: "peliculas-catalogo", 
       title: "Películas disponibles", 
-      ref: "/peliculas?", 
+      ref: "/peliculas", 
       items: peliculas 
     });
   }
@@ -281,7 +285,7 @@ export async function home() {
     categories.push({ 
       id: "series-catalogo", 
       title: "Series disponibles", 
-      ref: "/series??", 
+      ref: "/series", 
       items: series 
     });
   }
